@@ -1,5 +1,6 @@
 *.py[cod]
 .idea
+.idea/
 __pycache__/
 
 # Scratch files for when I am refactoring
