@@ -1,6 +1,6 @@
 import hashlib
 import os
-# import re
+import re
 import shutil
 
 
@@ -62,6 +62,38 @@ import shutil
 #
 #     return output
 
+# --------------------------------------------------------------------------
+def invert_dir_list(parent_d, subdirs_n, pattern=None):
+    """
+    Given a parent directory and a list of directory names, returns any other
+    directories in this parent dir that are not in this list (effectively
+    inverting the list of sub directories).
+
+    :param parent_d: The directory containing the sub-dirs we are trying to
+           invert.
+    :param subdirs_n: A list of sub-directories that are the inverse of the ones
+           we want to return.
+    :param pattern: An optional regex pattern to limit our inverse to. If None,
+           then all sub directories will be included. Defaults to None.
+
+    :return: A list of all sub directories in parent_d that are not in the list
+             subdirs_n.
+    """
+
+    items_n = os.listdir(parent_d)
+    output = list()
+
+    for item_n in items_n:
+        if os.path.isdir(os.path.join(parent_d, item_n)):
+            if item_n not in subdirs_n:
+                result = True
+                if pattern:
+                    result = re.match(pattern, item_n)
+                if result:
+                    output.append(item_n)
+
+    return output
+
 
 # ------------------------------------------------------------------------------
 def convert_unix_path_to_os_path(path):
@@ -78,6 +110,49 @@ def convert_unix_path_to_os_path(path):
     assert type(path) is str
 
     return os.path.join(*path.lstrip("/").split("/"))
+
+
+# ------------------------------------------------------------------------------
+def symlinks_to_real_paths(symlinks_p):
+    """
+    Given a list of symbolic link files, return a list of their real paths.
+
+    :param symlinks_p: The list of symlinks. If a file in this list is not
+           a symlink, its path will be included unchanged.
+
+    :return: A list of the real paths being pointed to by the symlinks. No
+             assurances are given about the order of the returned paths
+             as compared to the order of the given symlinks.
+    """
+
+    output = list()
+
+    for symlink_p in symlinks_p:
+        output.append(os.path.realpath(symlink_p))
+    return output
+
+
+# ------------------------------------------------------------------------------
+def recursively_list_files_in_dirs(source_dirs_d):
+    """
+    Recursively list all files in a directory or directories
+
+    :param source_dirs_d: a list of directories we want to recursively list.
+
+    :return: A list of files with full paths that are in any of the directories
+             (or any of their sub-directories)
+    """
+
+    if type(source_dirs_d) != list:
+        source_dirs_d = [source_dirs_d]
+
+    output = list()
+
+    for source_dir_d in source_dirs_d:
+        for dir_d, sub_dirs_n, files_n in os.walk(source_dir_d):
+            for file_n in files_n:
+                output.append(os.path.join(dir_d, dir_d, file_n))
+    return output
 
 
 # ------------------------------------------------------------------------------
@@ -157,7 +232,7 @@ def get_file_sizes(path_d):
 
 
 # ------------------------------------------------------------------------------
-def copy_and_add_ver_num(source_p, dest_d):
+def copy_and_add_ver_num(source_p, dest_d, ver_prefix="v", num_digits=4):
     """
     Copies a source file to the dest dir, adding a version number to the file
     right before the extension. If a file with that version number already
@@ -166,6 +241,12 @@ def copy_and_add_ver_num(source_p, dest_d):
 
     :param source_p: The full path to the file to copy.
     :param dest_d: The directory to copy to.
+    :param ver_prefix: The prefix to put onto the version number. For example,
+           if the prefix is "v", then the version number will be represented as
+           "v####". Defaults to "v".
+    :param num_digits: How much padding to use for the version numbers. For
+           example, 4 would lead to versions like: v0001 whereas 3 would lead to
+           versions like: v001. Defaults to 4.
 
     :return: A full path to the file that was copied.
     """
@@ -176,7 +257,7 @@ def copy_and_add_ver_num(source_p, dest_d):
     v = 1
     while True:
 
-        version = ".v" + str(v).rjust(4, "0")
+        version = "." + ver_prefix + str(v).rjust(num_digits, "0")
         dest_p = os.path.join(dest_d, base + version + ext)
 
         # This is not race condition safe, but it works for most cases...
@@ -190,7 +271,8 @@ def copy_and_add_ver_num(source_p, dest_d):
 
 
 # --------------------------------------------------------------------------
-def copy_file_deduplicated(source_p, dest_p, data_d, data_sizes):
+def copy_file_deduplicated(source_p, dest_p, data_d, data_sizes, ver_prefix="v",
+                           num_digits=4):
     """
     Given a full path to a source file, copy that file into the data directory
     and make a symlink in dest_p that points to this file. Does de-duplication
@@ -205,6 +287,12 @@ def copy_file_deduplicated(source_p, dest_p, data_d, data_sizes):
     :param data_sizes: A dictionary of all the files in the data_d keyed on file
            size. The key is the file size, the value is a list of files in
            data_d that are of that size.
+    :param ver_prefix: The prefix to put onto the version number. For example,
+           if the prefix is "v", then the version number will be represented as
+           "v####". Defaults to "v".
+    :param num_digits: How much padding to use for the version numbers. For
+           example, 4 would lead to versions like: v0001 whereas 3 would lead to
+           versions like: v001. Defaults to 4.
 
     :return: Nothing.
     """
@@ -239,7 +327,8 @@ def copy_file_deduplicated(source_p, dest_p, data_d, data_sizes):
     # data_d dir, with an added version number that ensures that we do
     # not  overwrite any previous versions of files with the same name.
     if matched_p is None:
-        matched_p = copy_and_add_ver_num(source_p, data_d)
+        matched_p = copy_and_add_ver_num(source_p, data_d, ver_prefix,
+                                         num_digits)
 
     # Lock this file to the extent that we can
     os.chmod(matched_p, 0o644)
