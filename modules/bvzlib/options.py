@@ -99,6 +99,7 @@ class Options(object):
                 "type",
                 "metavar",
                 "nargs",
+                "required",
                 "description",
             ]
 
@@ -115,13 +116,6 @@ class Options(object):
                     raise ValueError(err.msg)
 
             arg_list, arg_dict = self.format_for_argparse(settings)
-            #
-            # if settings["dest"].startswith("dest"):
-            #     print ", ".join(arg_list),
-            #     for key in arg_dict.keys():
-            #
-            #         print key + "=\"" + str(arg_dict[key]) + "\"",
-            #     print
             parser.add_argument(*arg_list, **arg_dict)
 
         # actually parse the command my_line
@@ -202,6 +196,13 @@ class Options(object):
                 except ValueError:
                     pass
 
+        # Required
+        if settings["required"]:
+            if settings["required"].upper() == "TRUE":
+                dct["required"] = True
+            else:
+                dct["required"] = False
+
         # Description
         if settings["description"]:
             dct["help"] = BRIGHT_YELLOW + settings["description"] + ENDC
@@ -214,11 +215,13 @@ class Options(object):
             if "default" in dct.keys():
                 del dct["default"]
 
-        # Positional arguments require that there be no dest
+        # Positional arguments require that there be no dest or required
         if (not settings["short_flag"].startswith("-") and
             not settings["long_flag"].startswith("-")):
             if "dest" in dct.keys():
                 del dct["dest"]
+            if "required" in dct.keys():
+                del dct["required"]
 
         # There is no such thing as a bool type, but users might type it in
         if settings["type"] is "bool":
