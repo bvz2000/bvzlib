@@ -186,15 +186,18 @@ class Options(object):
 
         # Nargs
         if settings["nargs"]:
-            try:
-                nargs = int(settings["nargs"])
-            except ValueError:
-                nargs = 0
-            if nargs >= 2:
+            if settings["nargs"] in ["?", "*", "+"]:
+                dct["nargs"] = settings["nargs"]
+            else:
                 try:
-                    dct["nargs"] = int(settings["nargs"])
+                    nargs = int(settings["nargs"])
                 except ValueError:
-                    pass
+                    nargs = 0
+                if nargs >= 2:
+                    try:
+                        dct["nargs"] = int(settings["nargs"])
+                    except ValueError:
+                        pass
 
         # Required
         if settings["required"]:
@@ -236,6 +239,11 @@ class Options(object):
                 del dct["metavar"]
             if "nargs" in dct.keys():
                 del dct["nargs"]
+
+        # If nargs is not an integer, remove the metavar
+        if "nargs" in dct.keys() and dct["nargs"] in ["?", "*", "+"]:
+            if "metavar" in dct.keys():
+                del dct["metavar"]
 
         return lst, dct
 
