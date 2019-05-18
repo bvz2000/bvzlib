@@ -4,63 +4,63 @@ import re
 import shutil
 
 
-# # ------------------------------------------------------------------------------
-# def expand_udims(path):
-#     """
-#     Given a file with '<UDIM>' in the path name, expand that to a list of actual
-#     files on disk.
-#
-#     :param path: The path with the text <UDIM> in it.
-#
-#     :return: A list of files that the path represents. Only actual files on disk
-#              will be returned.
-#     """
-#
-#     assert "<UDIM>" in path
-#
-#     output = list()
-#
-#     parent_d, file_n = os.path.split(path)
-#     base_n, end_n = file_n.split("<UDIM>")
-#
-#     files = os.listdir(parent_d)
-#     for test_n in files:
-#         if test_n.startswith(base_n) and test_n.endswith(end_n):
-#             output.append(os.path.join(parent_d, test_n))
-#
-#     return output
-#
-#
-# # ------------------------------------------------------------------------------
-# def expand_sequences(path):
-#     """
-#     Given a file with '.#' in the path name (with any number of # symbols),
-#     expand that to a list of actual files on disk.
-#
-#     :param path: The path with the text .# (with any number of # symbols) in it.
-#
-#     :return: A list of files that the path represents. Only actual files on disk
-#              will be returned.
-#     """
-#
-#     assert ".#" in path
-#
-#     output = list()
-#
-#     parent_d, file_n = os.path.split(path)
-#
-#     pattern = '(.*)(\.#+)(.*)'
-#     result = re.match(pattern, file_n)
-#
-#     base_n = result.groups()[0]
-#     end_n = result.groups()[2]
-#
-#     files = os.listdir(parent_d)
-#     for test_n in files:
-#         if test_n.startswith(base_n) and file_n.endswith(end_n):
-#             output.append(os.path.join(parent_d, test_n))
-#
-#     return output
+# ------------------------------------------------------------------------------
+def expand_udims(path):
+    """
+    Given a file with '<UDIM>' in the path name, expand that to a list of actual
+    files on disk.
+
+    :param path: The path with the text <UDIM> in it.
+
+    :return: A list of files that the path represents. Only actual files on disk
+             will be returned.
+    """
+
+    assert "<UDIM>" in path
+
+    output = list()
+
+    parent_d, file_n = os.path.split(path)
+    base_n, end_n = file_n.split("<UDIM>")
+
+    files = os.listdir(parent_d)
+    for test_n in files:
+        if test_n.startswith(base_n) and test_n.endswith(end_n):
+            output.append(os.path.join(parent_d, test_n))
+
+    return output
+
+
+# ------------------------------------------------------------------------------
+def expand_sequences(path):
+    """
+    Given a file with '.#' in the path name (with any number of # symbols),
+    expand that to a list of actual files on disk.
+
+    :param path: The path with the text .# (with any number of # symbols) in it.
+
+    :return: A list of files that the path represents. Only actual files on disk
+             will be returned.
+    """
+
+    assert ".#" in path
+
+    output = list()
+
+    parent_d, file_n = os.path.split(path)
+
+    pattern = '(.*)(\.#+)(.*)'
+    result = re.match(pattern, file_n)
+
+    base_n = result.groups()[0]
+    end_n = result.groups()[2]
+
+    files = os.listdir(parent_d)
+    for test_n in files:
+        if test_n.startswith(base_n) and file_n.endswith(end_n):
+            output.append(os.path.join(parent_d, test_n))
+
+    return output
 
 # --------------------------------------------------------------------------
 def invert_dir_list(parent_d, subdirs_n, pattern=None):
@@ -294,9 +294,9 @@ def copy_file_deduplicated(source_p, dest_p, data_d, data_sizes, ver_prefix="v",
            example, 4 would lead to versions like: v0001 whereas 3 would lead to
            versions like: v001. Defaults to 4.
 
-    :return: Nothing.
+    :return: The path to the actual de-duplicated file in data_d.
     """
-    # TODO: Do a verified copy and report back the result
+
     # Make sure that the dest_p is not a sub-dir of data_d. Do some other tests.
     assert not dest_p.startswith(data_d)
     assert os.path.exists(source_p)
@@ -342,6 +342,8 @@ def copy_file_deduplicated(source_p, dest_p, data_d, data_sizes, ver_prefix="v",
     if os.path.exists(dest_p):
         os.unlink(dest_p)
     os.symlink(relative_p, dest_p)
+
+    return matched_p
 
 
 # ------------------------------------------------------------------------------
