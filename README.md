@@ -53,6 +53,10 @@ all of the strings for an app in a particular language. It also contains the
 args for the options module above (if needed). An example of this resources
 file can be seen in the resources directory of this package.
 
+general
+--------------------------------------------------------------------------------
+Just a collection of generic functions that I reuse all of the time.
+
 
 
 installation:
