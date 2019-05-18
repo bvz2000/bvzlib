@@ -339,4 +339,56 @@ def copy_file_deduplicated(source_p, dest_p, data_d, data_sizes, ver_prefix="v",
     matched_file_n = os.path.split(matched_p.rstrip(os.path.sep))[1]
     relative_d = os.path.relpath(data_d, dest_parent_p)
     relative_p = os.path.join(relative_d, matched_file_n)
+    if os.path.exists(dest_p):
+        os.unlink(dest_p)
     os.symlink(relative_p, dest_p)
+
+
+# ------------------------------------------------------------------------------
+def frame_spec_expand(frame_spec, padding=None):
+    """
+    Given a string of the format:
+
+    this_is_a_sequence.####-####.ext
+
+    Returns an expanded list of files. Does not verify that the files actually
+    exist.
+
+    :param frame_spec: The string representing the file sequence.
+    :param padding: The number of digits to pad the frame numbers to. A padding
+           of 1 would mean no padding. If set to None, then the padding will be
+           automatically determined based on the length of the longest frame
+           number. Defaults to None.
+
+    :return: A list of files.
+    """
+
+    output = list()
+    pattern = r"^(.*)\.([0-9]+-[0-9]+)((?:[x:][0-9]+)?)@?(?:\.(.*))*$"
+
+    path, name = os.path.split(frame_spec)
+
+    result = re.match(pattern, name)
+    if result:
+        base = result.groups()[0]
+        frame_range = result.groups()[1]
+        try:
+            step = int(result.groups()[2].lstrip("x:"))
+        except ValueError:
+            step = 1
+        ext = result.groups()[3]
+
+        range_start = int(frame_range.split("-")[0])
+        range_end = int(frame_range.split("-")[1])
+        for frame in range(range_start, range_end + 1, step):
+            if not padding:
+                padding = len(str(range_end))
+            frame = str(frame).rjust(padding, "0")
+            expanded_name = base + "." + frame + "." + ext
+            output.append(os.path.join(path, expanded_name))
+
+        return output
+
+    else:
+
+        return [frame_spec]
