@@ -62,3 +62,14 @@ class Config(ConfigParser.SafeConfigParser):
             raise IOError("Cannot locate config file: " + self.config_p)
 
         self.read(self.config_p)
+
+    # --------------------------------------------------------------------------
+    def save(self):
+        """
+        Writes the config parser back out to disk.
+
+        :return: Nothing.
+        """
+
+        with open(self.config_p, "w") as f:
+            self.write(f)
