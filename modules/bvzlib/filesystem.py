@@ -137,7 +137,8 @@ def convert_unix_path_to_os_path(path):
 # ------------------------------------------------------------------------------
 def symlinks_to_real_paths(symlinks_p):
     """
-    Given a list of symbolic link files, return a list of their real paths.
+    Given a list of symbolic link files, return a list of their real paths. Only
+    works on Unix-like systems for the moment.
 
     :param symlinks_p: The list of symlinks. If a file in this list is not
            a symlink, its path will be included unchanged.
@@ -416,3 +417,60 @@ def frame_spec_expand(frame_spec, padding=None):
     else:
 
         return [frame_spec]
+
+
+# ------------------------------------------------------------------------------
+def ancestor_contains_file(path_p, files_n, depth=None):
+    """
+    Returns the path of any parent directory (evaluated recursively up the
+    hierarchy) that contains any of the files in the list: files_n. This is
+    typically used to see if any parent directory contains a semaphore file.
+    For example: If your current path (where "current" just means some path
+    you already have) is /this/is/my/path, and you want to see if any of the
+    parent paths contain a specific file or files, then this method will allow
+    you to do that.
+
+    :param path_p: The path we are testing.
+    :param files_n: A list of file names we are looking for.
+    :param depth: Limit the number of levels up to look. If None, then the
+           search will continue all the way up to the root level. Defaults to
+           None. For example: a depth of 1 will only check the immediate parent
+           of the given path. 2 will check the immediate parent and its parent.
+           Searches will never progress "past" the root, regardless of depth.
+
+    :return: The path of the first parent that contains any one of these files.
+             If no ancestors contain any of these files, returns None.
+    """
+
+    if type(files_n) != list:
+        files_n = [files_n]
+
+    path_p = path_p.rstrip(os.path.sep)
+
+    if not os.path.isdir(path_p):
+        path_p = os.path.dirname(path_p)
+
+    already_at_root = False
+    count = 0
+
+    test_p = os.path.dirname(path_p)
+    while True:
+
+        # Check each of the test files.
+        for file_n in files_n:
+            if os.path.exists(os.path.join(test_p, file_n)):
+                return test_p
+
+        # If nothing is found, move up to the next parent dir.
+        test_p = os.path.dirname(test_p)
+
+        # Increment the count and bail if we have hit our max depth.
+        count += 1
+        if depth and count >= depth:
+            return None
+
+        # Check to see if we are at the root level (bail if we are)
+        if os.path.dirname(test_p) == test_p:
+            if already_at_root:
+                return None
+            already_at_root = True
