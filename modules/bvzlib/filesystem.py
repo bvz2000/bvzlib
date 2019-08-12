@@ -27,62 +27,85 @@ import shutil
 
 
 # ------------------------------------------------------------------------------
-def expand_udims(path):
+def expand_udims(path, udim_string="<UDIM>", limit_to_udim_convention=True):
     """
-    Given a file with '<UDIM>' in the path name, expand that to a list of actual
-    files on disk.
+    Given a file with udim_string in the path name, expand that to a list of
+    actual files on disk.
 
-    :param path: The path with the text <UDIM> in it.
+    :param path: The path with the udim_pattern in it.
+    :param udim_string: The udim format we are matching. Defaults to: <UDIM>.
+    :param limit_to_udim_convention: If True, then only UDIM's of the format:
+           #### will be included. If False, then udim_string essentially becomes
+           a wild-card and will match any string. Defaults to True.
 
     :return: A list of files that the path represents. Only actual files on disk
              will be returned.
     """
 
-    assert "<UDIM>" in path
+    assert udim_string in path
 
     output = list()
 
+    udim_pattern = r"(.*)(" + udim_string + ")(.*)"
     parent_d, file_n = os.path.split(path)
-    base_n, end_n = file_n.split("<UDIM>")
+
+    result = re.match(udim_pattern, file_n)
+    base_n = result.groups()[0]
+    end_n = result.groups()[2]
+
+    if limit_to_udim_convention:
+        pattern = '[1-9][0-9][0-9][0-9]'
+    else:
+        pattern = '.*'
 
     files = os.listdir(parent_d)
     for test_n in files:
         if test_n.startswith(base_n) and test_n.endswith(end_n):
-            output.append(os.path.join(parent_d, test_n))
+            udim = test_n[len(base_n):-1 * len(end_n)]
+            result = re.match(pattern, udim)
+            if result:
+                output.append(os.path.join(parent_d, test_n))
 
     return output
 
 
 # ------------------------------------------------------------------------------
-def expand_sequences(path):
+def expand_sequences(path, sequence_string="#"):
     """
-    Given a file with '.#' in the path name (with any number of # symbols),
-    expand that to a list of actual files on disk.
+    Given a file with the sequence_string (surrounded by dots) in the path name
+    (with any number of sequence_string symbols), expand that to a list of
+    actual files on disk. For example, if sequence string is the pound symbol
+    (#) then expand to find any number of files that have this pattern.
 
-    :param path: The path with the text .# (with any number of # symbols) in it.
+    :param path: The path with any number of the the sequence_strings in it.
 
     :return: A list of files that the path represents. Only actual files on disk
              will be returned.
     """
 
-    assert ".#" in path
+    assert sequence_string in path
 
     output = list()
 
+    seq_pattern = r"^([^.]*)(\." + sequence_string + "+)(\..*)?$"
     parent_d, file_n = os.path.split(path)
 
-    pattern = '(.*)(\.#+)(.*)'
-    result = re.match(pattern, file_n)
-
+    result = re.match(seq_pattern, file_n)
     base_n = result.groups()[0]
     end_n = result.groups()[2]
+
+    pattern = r"\.[0-9]+"
 
     files = os.listdir(parent_d)
     for test_n in files:
         if test_n.startswith(base_n) and file_n.endswith(end_n):
-            output.append(os.path.join(parent_d, test_n))
+            sequence_num = test_n[len(base_n):-1 * len(end_n)]
+            result = re.match(pattern, sequence_num)
+            if result:
+                output.append(os.path.join(parent_d, test_n))
 
     return output
+
 
 # --------------------------------------------------------------------------
 def invert_dir_list(parent_d, subdirs_n, pattern=None):
@@ -205,14 +228,16 @@ def md5_for_file(file_p, block_size=2**20):
 def verified_copy_file(src, dst):
     """
     Given a source file and a destination, copies the file, and then checksum's
-    both files to ensure that the copy matches the source.
+    both files to ensure that the copy matches the source. Raises an error if
+    the copied file's md5 checksum does not match the source file's md5
+    checksum.
 
     :param src: The source file to be copied.
     :param dst: The destination file name where the file will be copied. If the
            destination file already exists, an error will be raised. You must
            supply the destination file name, not just the destination dir.
 
-    :return: True if the copy was successful. False otherwise.
+    :return: Nothing.
     """
 
     shutil.copy(src, dst)
@@ -220,11 +245,13 @@ def verified_copy_file(src, dst):
     src_md5 = md5_for_file(src)
     dst_md5 = md5_for_file(dst)
 
-    return src_md5 == dst_md5
+    if not src_md5 == dst_md5:
+        msg = "Verification of copy failed (md5 checksums to not match): "
+        raise IOError(msg + src + " --> " + dst)
 
 
 # --------------------------------------------------------------------------
-def get_file_sizes(path_d):
+def files_keyed_by_size(path_d):
     """
     Builds a dictionary of file sizes in a directory. The key is the file size,
     the value is a list of file names.
@@ -255,7 +282,8 @@ def get_file_sizes(path_d):
 
 
 # ------------------------------------------------------------------------------
-def copy_and_add_ver_num(source_p, dest_d, ver_prefix="v", num_digits=4):
+def copy_and_add_ver_num(source_p, dest_d, ver_prefix="v", num_digits=4,
+                         do_verified_copy=False):
     """
     Copies a source file to the dest dir, adding a version number to the file
     right before the extension. If a file with that version number already
@@ -270,6 +298,8 @@ def copy_and_add_ver_num(source_p, dest_d, ver_prefix="v", num_digits=4):
     :param num_digits: How much padding to use for the version numbers. For
            example, 4 would lead to versions like: v0001 whereas 3 would lead to
            versions like: v001. Defaults to 4.
+    :param do_verified_copy: If True, then a verified copy will be performed.
+           Defaults to False.
 
     :return: A full path to the file that was copied.
     """
@@ -288,7 +318,10 @@ def copy_and_add_ver_num(source_p, dest_d, ver_prefix="v", num_digits=4):
             v += 1
             continue
 
-        shutil.copy(source_p, dest_p)
+        if do_verified_copy:
+            verified_copy_file(source_p, dest_p)
+        else:
+            shutil.copy(source_p, dest_p)
 
         return dest_p
 
