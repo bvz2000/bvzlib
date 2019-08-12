@@ -47,6 +47,7 @@ BRIGHT_WHITE = '\033[97m'
 ENDC = '\033[0m'
 
 
+# ==============================================================================
 class Options(object):
     """
     Wrapper for the arg parser object.
@@ -135,6 +136,13 @@ class Options(object):
                     err.msg = err.msg.format(path=self.resc.resources_p,
                                              section=option_name,
                                              setting=flag)
+                    raise ValueError(err.msg)
+
+                if settings["short_flag"].strip() == "":
+                    err = self.local_resc.error(108)
+                    resc_p = os.path.abspath(self.resc.resources_p)
+                    err.msg = err.msg.format(file=resc_p,
+                                             setting="short_flag")
                     raise ValueError(err.msg)
 
             arg_list, arg_dict = self.format_for_argparse(settings)
