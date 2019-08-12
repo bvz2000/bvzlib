@@ -27,7 +27,9 @@ import shutil
 
 
 # ------------------------------------------------------------------------------
-def expand_udims(path, udim_string="<UDIM>", limit_to_udim_convention=True):
+def expand_udims(path,
+                 udim_string="<UDIM>",
+                 limit_to_udim_convention=True):
     """
     Given a file with udim_string in the path name, expand that to a list of
     actual files on disk.
@@ -70,7 +72,8 @@ def expand_udims(path, udim_string="<UDIM>", limit_to_udim_convention=True):
 
 
 # ------------------------------------------------------------------------------
-def expand_sequences(path, sequence_string="#"):
+def expand_sequences(path,
+                     sequence_string="#"):
     """
     Given a file with the sequence_string (surrounded by dots) in the path name
     (with any number of sequence_string symbols), expand that to a list of
@@ -108,7 +111,9 @@ def expand_sequences(path, sequence_string="#"):
 
 
 # --------------------------------------------------------------------------
-def invert_dir_list(parent_d, subdirs_n, pattern=None):
+def invert_dir_list(parent_d,
+                    subdirs_n,
+                    pattern=None):
     """
     Given a parent directory and a list of directory names, returns any other
     directories in this parent dir that are not in this list (effectively
@@ -202,7 +207,8 @@ def recursively_list_files_in_dirs(source_dirs_d):
 
 
 # ------------------------------------------------------------------------------
-def md5_for_file(file_p, block_size=2**20):
+def md5_for_file(file_p,
+                 block_size=2**20):
     """
     Create an md5 checksum for a file without reading the whole file in in a
     single chunk.
@@ -225,7 +231,8 @@ def md5_for_file(file_p, block_size=2**20):
 
 
 # ------------------------------------------------------------------------------
-def verified_copy_file(src, dst):
+def verified_copy_file(src,
+                       dst):
     """
     Given a source file and a destination, copies the file, and then checksum's
     both files to ensure that the copy matches the source. Raises an error if
@@ -240,7 +247,8 @@ def verified_copy_file(src, dst):
     :return: Nothing.
     """
 
-    shutil.copy(src, dst)
+    shutil.copy(src,
+                dst)
 
     src_md5 = md5_for_file(src)
     dst_md5 = md5_for_file(dst)
@@ -282,7 +290,10 @@ def files_keyed_by_size(path_d):
 
 
 # ------------------------------------------------------------------------------
-def copy_and_add_ver_num(source_p, dest_d, ver_prefix="v", num_digits=4,
+def copy_and_add_ver_num(source_p,
+                         dest_d,
+                         ver_prefix="v",
+                         num_digits=4,
                          do_verified_copy=False):
     """
     Copies a source file to the dest dir, adding a version number to the file
@@ -327,7 +338,11 @@ def copy_and_add_ver_num(source_p, dest_d, ver_prefix="v", num_digits=4,
 
 
 # --------------------------------------------------------------------------
-def copy_file_deduplicated(source_p, dest_p, data_d, data_sizes, ver_prefix="v",
+def copy_file_deduplicated(source_p,
+                           dest_p,
+                           data_d,
+                           data_sizes,
+                           ver_prefix="v",
                            num_digits=4):
     """
     Given a full path to a source file, copy that file into the data directory
@@ -403,7 +418,8 @@ def copy_file_deduplicated(source_p, dest_p, data_d, data_sizes, ver_prefix="v",
 
 
 # ------------------------------------------------------------------------------
-def frame_spec_expand(frame_spec, padding=None):
+def frame_spec_expand(frame_spec,
+                      padding=None):
     """
     Given a string of the format:
 
@@ -453,7 +469,9 @@ def frame_spec_expand(frame_spec, padding=None):
 
 
 # ------------------------------------------------------------------------------
-def ancestor_contains_file(path_p, files_n, depth=None):
+def ancestor_contains_file(path_p,
+                           files_n,
+                           depth=None):
     """
     Returns the path of any parent directory (evaluated recursively up the
     hierarchy) that contains any of the files in the list: files_n. This is
