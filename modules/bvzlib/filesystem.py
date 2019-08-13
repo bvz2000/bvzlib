@@ -27,6 +27,7 @@ import shutil
 
 import general
 
+
 # ------------------------------------------------------------------------------
 def expand_files(path,
                  do_udim=True,
@@ -56,14 +57,14 @@ def expand_files(path,
     :param seq_delim: What the delimeter on either side of a sequence number is.
            Defaults to ".".
     :param match_seq_string_len: If True, then the number of seq_string
-           delimeters will have to match the actual number of digits in the file
-           name. For example, if the seq_string delimeter is "###" then only
+           delimiters will have to match the actual number of digits in the file
+           name. For example, if the seq_string delimiter is "###" then only
            files with three digits in the sequence will match. If False, then
-           files with any number of digits in the sequnce will match, even if
-           the delimeter is set to a single character or (to pick an arbitrary
-           number) twenty characters. Note: If you use Nuke-style delimters like
-           %02d, that will count as 4 digits, not 2. Better to translate those
-           into a simpler format like "##" instead. Defaults to False.
+           files with any number of digits in the sequence will match, even if
+           the delimiter is set to a single character or (to pick an arbitrary
+           number) twenty characters. Note: If you use Nuke-style delimiters
+           like %02d, that will count as 4 digits, not 2. Better to translate
+           those into a simpler format like "##" instead. Defaults to False.
 
     :return: A list of files on disk that match the pattern given with path.
              Only actual files on disk will be returned.
@@ -72,7 +73,13 @@ def expand_files(path,
     assert len(seq_delim) == 1
     assert os.path.isabs(path)
 
-    actual_udim_pattern = r'[1-9][0-9][0-9][0-9]'
+    output_pattern = ""
+
+    if limit_to_udim_convention:
+        actual_udim_pattern = r'[1-9][0-9][0-9][0-9]'
+    else:
+        actual_udim_pattern = '.*?'
+
     if match_seq_string_len:
         actual_seq_pattern = '[0-9]{' + str(len(seq_string)) + '}'
     else:
@@ -80,18 +87,15 @@ def expand_files(path,
 
     udim_prefix_len = 0
     udim = ""
-    udim_postfix_len = 0
     if do_udim:
         udim_pattern = r"(.*)(" + udim_string + ")(.*)"
         result = re.match(udim_pattern, path)
         if result:
-            udim_prefix_len =len(result.groups()[0])
+            udim_prefix_len = len(result.groups()[0])
             udim = result.groups()[1]
-            udim_postfix_len = len(result.groups()[2])
 
     seq_prefix_len = 0
     seq = ""
-    seq_postfix_len = 0
     if do_seq:
         seq_delim = general.escape_regex_string(seq_delim)
         seq_string = general.escape_regex_string(seq_string)
@@ -106,7 +110,6 @@ def expand_files(path,
         if result:
             seq_prefix_len = len(result.groups()[0]) + len(result.groups()[1])
             seq = result.groups()[2]
-            seq_postfix_len = len(result.groups()[3]) + len(result.groups()[4])
 
     # If no seq and no udim, return the original path
     if not udim and not seq:
@@ -161,89 +164,6 @@ def expand_files(path,
             output.append(test_p)
 
     return output
-#
-# # ------------------------------------------------------------------------------
-# def expand_udims(path,
-#                  udim_string="<UDIM>",
-#                  limit_to_udim_convention=True):
-#     """
-#     Given a file with udim_string in the path name, expand that to a list of
-#     actual files on disk.
-#
-#     :param path: The path with the udim_pattern in it.
-#     :param udim_string: The udim format we are matching. Defaults to: <UDIM>.
-#     :param limit_to_udim_convention: If True, then only UDIM's of the format:
-#            #### will be included. If False, then udim_string essentially becomes
-#            a wild-card and will match any string. Defaults to True.
-#
-#     :return: A list of files that the path represents. Only actual files on disk
-#              will be returned.
-#     """
-#
-#     assert udim_string in path
-#
-#     output = list()
-#
-#     udim_pattern = r"(.*)(" + udim_string + ")(.*)"
-#     parent_d, file_n = os.path.split(path)
-#
-#     result = re.match(udim_pattern, file_n)
-#     base_n = result.groups()[0]
-#     end_n = result.groups()[2]
-#
-#     if limit_to_udim_convention:
-#         pattern = '[1-9][0-9][0-9][0-9]'
-#     else:
-#         pattern = '.*'
-#
-#     files = os.listdir(parent_d)
-#     for test_n in files:
-#         if test_n.startswith(base_n) and test_n.endswith(end_n):
-#             udim = test_n[len(base_n):-1 * len(end_n)]
-#             result = re.match(pattern, udim)
-#             if result:
-#                 output.append(os.path.join(parent_d, test_n))
-#
-#     return output
-#
-#
-# # ------------------------------------------------------------------------------
-# def expand_sequences(path,
-#                      sequence_string="#"):
-#     """
-#     Given a file with the sequence_string (surrounded by dots) in the path name
-#     (with any number of sequence_string symbols), expand that to a list of
-#     actual files on disk. For example, if sequence string is the pound symbol
-#     (#) then expand to find any number of files that have this pattern.
-#
-#     :param path: The path with any number of the the sequence_strings in it.
-#
-#     :return: A list of files that the path represents. Only actual files on disk
-#              will be returned.
-#     """
-#
-#     assert sequence_string in path
-#
-#     output = list()
-#
-#     seq_pattern = r"^([^.]*)(\." + sequence_string + "+)(\..*)?$"
-#     parent_d, file_n = os.path.split(path)
-#
-#     result = re.match(seq_pattern, file_n)
-#     base_n = result.groups()[0]
-#     end_n = result.groups()[2]
-#
-#     pattern = r"\.[0-9]+"
-#
-#     files = os.listdir(parent_d)
-#     for test_n in files:
-#         if test_n.startswith(base_n) and file_n.endswith(end_n):
-#             sequence_num = test_n[len(base_n):-1 * len(end_n)]
-#             result = re.match(pattern, sequence_num)
-#             if result:
-#                 output.append(os.path.join(parent_d, test_n))
-#
-#     return output
 
 
 # ------------------------------------------------------------------------------
@@ -446,7 +366,6 @@ def compare_files(file_a_p,
         return md5_a == md5_b
 
     return False
-
 
 
 # ------------------------------------------------------------------------------
