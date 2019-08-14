@@ -70,6 +70,7 @@ def expand_files(path,
              Only actual files on disk will be returned.
     """
 
+    # TODO: It works! But damn it is ugly. Should consider refactoring.
     assert len(seq_delim) == 1
     assert os.path.isabs(path)
 
@@ -167,17 +168,17 @@ def expand_files(path,
 
 
 # ------------------------------------------------------------------------------
-def expand_frame_spec(frame_spec,
+def expand_frame_spec(file_n,
                       padding=None):
     """
-    Given a string of the format:
+    Given a string of the format (for example):
 
     this_is_a_sequence.####-####.ext
 
     Returns an expanded list of files. Does not verify that the files actually
     exist.
 
-    :param frame_spec: The string representing the file sequence.
+    :param file_n: The string representing the file sequence.
     :param padding: The number of digits to pad the frame numbers to. A padding
            of 1 would mean no padding. If set to None, then the padding will be
            automatically determined based on the length of the longest frame
@@ -187,34 +188,55 @@ def expand_frame_spec(frame_spec,
     """
 
     output = list()
-    pattern = r"^(.*)\.([0-9]+-[0-9]+)((?:[x:][0-9]+)?)@?(?:\.(.*))*$"
 
-    path, name = os.path.split(frame_spec)
+    pattern = r"(?:\.|,)(\d+(?:(?:-\d+)?))@?(?:(?:[x:]([1-9]+))*)"
 
-    result = re.match(pattern, name)
-    if result:
-        base = result.groups()[0]
-        frame_range = result.groups()[1]
+    path, name = os.path.split(file_n)
+
+    compiled_pattern = re.compile(pattern)
+
+    padding_len = 0
+    match_start = len(name)
+    match_end = 0
+    for match in compiled_pattern.finditer(name):
+        frame_range, step = match.groups()
+        match_start = min(match_start, match.start())
+        match_end = max(match_end, match.end())
+        padding_len = max(padding_len, len(frame_range.split("-")[0]))
         try:
-            step = int(result.groups()[2].lstrip("x:"))
-        except ValueError:
+            padding_len = max(padding_len, len(frame_range.split("-")[1]))
+        except IndexError:
+            pass
+
+    if padding:
+        padding_len = padding
+
+    for match in compiled_pattern.finditer(name):
+        frame_range, step = match.groups()
+
+        start = int(frame_range.split("-")[0])
+        try:
+            end = int(frame_range.split("-")[1])
+        except IndexError:
+            end = start
+
+        try:
+            step = int(step)
+        except (TypeError, ValueError):
             step = 1
-        ext = result.groups()[3]
 
-        range_start = int(frame_range.split("-")[0])
-        range_end = int(frame_range.split("-")[1])
-        for frame in range(range_start, range_end + 1, step):
-            if not padding:
-                padding = len(str(range_end))
-            frame = str(frame).rjust(padding, "0")
-            expanded_name = base + "." + frame + "." + ext
-            output.append(os.path.join(path, expanded_name))
+        for i in range(start, end + 1, step):
+            output_str = name[:match_start + 1]
+            output_str += str(i).rjust(padding_len, "0")
+            output_str += name[match_end:]
+            output_str = os.path.join(path, output_str)
 
-        return output
+            output.append(output_str)
 
-    else:
+    if not output:
+        output = [file_n]
 
-        return [frame_spec]
+    return output
 
 
 # --------------------------------------------------------------------------
