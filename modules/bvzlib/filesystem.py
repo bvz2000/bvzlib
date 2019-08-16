@@ -25,146 +25,214 @@ import os
 import re
 import shutil
 
-import general
+
+# ------------------------------------------------------------------------------
+def seq_and_udim_ids_to_regex(path,
+                              match_hash_length=False,
+                              udim_identifier="<UDIM>",
+                              strict_udim_format=True):
+    """
+    Given a file string that may have a UDIM identifier and/or a sequence
+    identifier in it, return the same string, but converted to a regex pattern
+    that would match the UDIM and/or sequence patterns.
+
+    For example, given an input like:
+
+    /tmp/file_<UDIM>.####.exr
+
+    Returns (assuming strict udim format and not matching the hash length):
+
+    \/tmp\/file_[1-9]\d{3}\.\d+\.exr
+
+    The UDIM identifier is defined by the calling function. If the UDIM
+    identifier occurs more than once in the path, only the first occurrence will
+    be used. A sequence identifier is either any number of hash symbols
+    following a dot or underscore, or a string in the printf format (%0d). If
+    both printf and the hash symbols are present, only the printf format will be
+    recognized as a sequence identifier. If the printf sequence identifier or
+    the hash symbols identifier occurs more than once in the path, only the
+    first occurrence will be used.
+
+    :param path: The path to the file name that may contain UDIM identifiers.
+    :param match_hash_length: If True, then the output regex will be designed
+           such that the number of digits has to match the number of hashes.
+           If False, then a single hash would match any number of digits.
+           For example: if True, then filename.#.exr would only match files with
+           a single digit sequence number. If False, then any sequence number,
+           no matter how long, would match. If the sequence identifier is in the
+           printf format, this argument is ignored.
+    :param udim_identifier: The string that is used as the UDIM identifier.
+           Defaults to "<UDIM>".
+    :param strict_udim_format: If True, then UDIM's will have to conform to the
+           #### format, where the starting value is 1001. If False, then the
+           UDIM must start with four digits, but can then contain any extra
+           characters. Substance Painter allows this for example. Note, setting
+           this to False may lead to somewhat erroneous identification of UDIM's
+           in files, so - unless absolutely needed - this should be se to True.
+           Defaults to True.
+
+    :return: A string where the UDIM identifier, if it exists, is replaced with
+             a regex pattern that matches this identifier.
+    """
+
+    parent_d, file_n = os.path.split(path)
+
+    udim_split = udim_id_to_regex(file_n,
+                                  udim_identifier,
+                                  strict_udim_format)
+
+    # Check both the first and last element of the udim_split for a sequence id
+    prefix_seq_split = seq_id_to_regex(udim_split[0],
+                                       match_hash_length)
+    suffix_seq_split = seq_id_to_regex(udim_split[2],
+                                       match_hash_length)
+
+    # Assemble everything into a single string again
+    output = re.escape(os.path.join(parent_d, prefix_seq_split[0]))
+    output += prefix_seq_split[1]  # <- might have seq regex pattern in it.
+    output += re.escape(prefix_seq_split[2])
+    output += udim_split[1]  # <- might have UDIM regex pattern it in.
+    output += re.escape(suffix_seq_split[0])
+    output += suffix_seq_split[1]  # <- might have seq regex pattern in it.
+    output += re.escape(suffix_seq_split[2])
+
+    return output
 
 
 # ------------------------------------------------------------------------------
-def expand_files(path,
-                 do_udim=True,
-                 udim_string="<UDIM>",
-                 limit_to_udim_convention=True,
-                 do_seq=True,
-                 seq_string="#",
-                 seq_delim=".",
-                 match_seq_string_len=False):
+def udim_id_to_regex(string,
+                     udim_identifier="<UDIM>",
+                     strict_udim_format=True):
     """
-    Given a file string that may have a UDIM identifier and/or sequence
-    identifiers in it, return a list of actual files on disk that match these
-    patterns.
+    Given a string that may have a UDIM identifier in it, return the same
+    string split into three elements: The prefix, the udim identifier converted
+    to a regular expression, and the suffix.
 
-    :param path: The path to the file name that may contain UDIM identifiers
-           and/or sequence identifiers. Must be an absolute path.
-    :param do_udim: Whether or not to expand UDIM identifiers. Defaults to True.
-    :param udim_string: What the UDIM identifier is. Defaults to "<UDIM>".
-    :param limit_to_udim_convention: Whether to limit matches to the UDIM
-           identifier to the normal four digit numerical pattern (i.e. 1001). If
-           False, then pretty much any text will count as a UDIM. This is
-           something that Substance Painter allows for instance. Defaults to
-           True.
-    :param do_seq: Whether or not ot expand sequnce identifiers. Defaults to
-           True.
-    :param seq_string: What the sequence string is. Defaults to "#".
-    :param seq_delim: What the delimeter on either side of a sequence number is.
-           Defaults to ".".
-    :param match_seq_string_len: If True, then the number of seq_string
-           delimiters will have to match the actual number of digits in the file
-           name. For example, if the seq_string delimiter is "###" then only
-           files with three digits in the sequence will match. If False, then
-           files with any number of digits in the sequence will match, even if
-           the delimiter is set to a single character or (to pick an arbitrary
-           number) twenty characters. Note: If you use Nuke-style delimiters
-           like %02d, that will count as 4 digits, not 2. Better to translate
-           those into a simpler format like "##" instead. Defaults to False.
+    For example, given an input like:
 
-    :return: A list of files on disk that match the pattern given with path.
-             Only actual files on disk will be returned.
+    file_<UDIM>.exr
+
+    Returns (assuming strict udim format):
+
+    ("file_[1-9]", "\d{3}", ".exr")
+
+    The UDIM identifier is defined by the calling function. If the UDIM
+    identifier occurs more than once in the path, only the first occurrence will
+    be used.
+
+    :param string: The string that may contain UDIM identifiers.
+    :param udim_identifier: The string that is used as the UDIM identifier.
+           Defaults to "<UDIM>".
+    :param strict_udim_format: If True, then UDIM's will have to conform to the
+           #### format, where the starting value is 1001. If False, then the
+           UDIM must start with four digits, but can then contain any extra
+           characters. Substance Painter allows this for example. Note, setting
+           this to False may lead to somewhat erroneous identification of UDIM's
+           in files, so - unless absolutely needed - this should be se to True.
+           Defaults to True.
+
+    :return: A tuple containing three items: The portion of the text before the
+             UDIM identifier, the UDIM identifier converted to a regular
+             expression, and the portion of the text after the identifier. Note:
+             The portions before and after the identifier may have special
+             characters in them that will need to be escaped before thy could be
+             used in a regular expression. If the UDIM identifier is not found,
+             returns the original string in the first element of the tuple, and
+             blank strings in the other two elements.
     """
 
-    # TODO: It works! But damn it is ugly. Should consider refactoring.
-    assert len(seq_delim) == 1
-    assert os.path.isabs(path)
+    input_pattern = r'.*?(' + re.escape(udim_identifier) + ').*'
 
-    output_pattern = ""
+    result = re.match(input_pattern, string)
 
-    if limit_to_udim_convention:
-        actual_udim_pattern = r'[1-9][0-9][0-9][0-9]'
+    if result:
+        identifier = result.groups()[0]
+
+        prefix, suffix = string.split(identifier, 1)
+
+        if strict_udim_format:
+            output_pattern = "[1-9]\d{3}"
+        else:
+            output_pattern = "[1-9]\d{3}.*"
+
+        return prefix, output_pattern, suffix
+
+    return string, "", ""
+
+
+# ------------------------------------------------------------------------------
+def seq_id_to_regex(string,
+                    match_hash_length=False):
+    """
+    Given a file string that may have a sequence identifier in it, return the
+    same string, but converted to a regex pattern that would match the same
+    sequence pattern.
+
+    For example, given an input like:
+
+    /tmp/file.#.exr
+
+    Returns:
+
+    \/tmp\/file\.\d+\.exr
+
+    A sequence identifier is either any number of hash symbols following a dot
+    or underscore, or a string in the printf format (%0d). If both printf and
+    the hash symbols are present, only the printf format will be recognized as a
+    sequence identifier. If the printf sequence identifier or the hash symbols
+    identifier occurs more than once in the path, only the first occurrence will
+    be used.
+
+    :param string: The string that may contain sequence identifiers.
+    :param match_hash_length: If True, then the output regex will be designed
+           such that the number of digits has to match the number of hashes.
+           If False, then a single hash would match any number of digits.
+           For example: if True, then filename.#.exr would only match files with
+           a single digit sequence number. If False, then any sequence number,
+           no matter how long, would match. If the sequence identifier is in the
+           printf format, this argument is ignored.
+
+    :return: A tuple containing three items: The portion of the text before the
+             seq identifier, the seq identifier converted to a regular
+             expression, and the portion of the text after the identifier. Note:
+             The portions before and after the identifier may have special
+             characters in them that will need to be escaped before thy could be
+             used in a regular expression. If the seq identifier is not found,
+             returns the original string in the first element of the tuple, and
+             blank strings in the other two elements.
+    """
+
+    test_pattern = r'[\._]%\d+d'
+    printf_input_pattern = r'.*?()(%\d+d).*'  # Blank group is intentional
+    hash_input_pattern = r'.*?([\._])(#+).*'
+
+    do_printf = re.search(test_pattern, string)
+    if do_printf:
+        result = re.match(printf_input_pattern, string)
     else:
-        actual_udim_pattern = '.*?'
+        result = re.match(hash_input_pattern, string)
 
-    if match_seq_string_len:
-        actual_seq_pattern = '[0-9]{' + str(len(seq_string)) + '}'
-    else:
-        actual_seq_pattern = '[0-9]+'
+    if result:
+        delim, identifier = result.groups()
 
-    udim_prefix_len = 0
-    udim = ""
-    if do_udim:
-        udim_pattern = r"(.*)(" + udim_string + ")(.*)"
-        result = re.match(udim_pattern, path)
-        if result:
-            udim_prefix_len = len(result.groups()[0])
-            udim = result.groups()[1]
+        if do_printf:
+            length = str(int(identifier[1:-1]))
+        else:
+            if match_hash_length:
+                length = str(len(identifier))
+            else:
+                length = None
 
-    seq_prefix_len = 0
-    seq = ""
-    if do_seq:
-        seq_delim = general.escape_regex_string(seq_delim)
-        seq_string = general.escape_regex_string(seq_string)
+        prefix, suffix = string.split(delim + identifier, 1)
 
-        seq_pattern = "(.*?)"
-        seq_pattern += "(" + seq_delim + "{1}?)"
-        seq_pattern += "(" + seq_string + "+)"
-        seq_pattern += "(" + seq_delim + "{0,1})"
-        seq_pattern += "(.*)"
+        if length:
+            output_pattern = re.escape(delim) + "\d{" + length + "}"
+        else:
+            output_pattern = re.escape(delim) + "\d+"
 
-        result = re.match(seq_pattern, path)
-        if result:
-            seq_prefix_len = len(result.groups()[0]) + len(result.groups()[1])
-            seq = result.groups()[2]
+        return prefix, output_pattern, suffix
 
-    # If no seq and no udim, return the original path
-    if not udim and not seq:
-        output_pattern = path
-
-    # If no seq, fake up some seq len values
-    if not seq:
-        seq_prefix_len = udim_prefix_len + len(udim)
-
-    # If no udim, fix up the udim values
-    if not udim:
-        udim_prefix_len = seq_prefix_len + len(seq)
-
-    # UDIM comes before seq?
-    if udim_prefix_len < seq_prefix_len:
-        base = path[0:udim_prefix_len]
-        mid = path[udim_prefix_len + len(udim):seq_prefix_len]
-        final = path[seq_prefix_len + len(seq):]
-
-        output_pattern = ""
-
-        output_pattern += general.escape_regex_string(base)
-        if udim:
-            output_pattern += actual_udim_pattern
-        output_pattern += general.escape_regex_string(mid)
-        if seq:
-            output_pattern += actual_seq_pattern
-        output_pattern += general.escape_regex_string(final)
-
-    # seq comes before UDIM?
-    if udim_prefix_len > seq_prefix_len:
-        base = path[0:seq_prefix_len]
-        mid = path[seq_prefix_len + len(seq):udim_prefix_len]
-        final = path[udim_prefix_len + len(udim):]
-
-        output_pattern = ""
-
-        output_pattern += general.escape_regex_string(base)
-        if seq:
-            output_pattern += actual_seq_pattern
-        output_pattern += general.escape_regex_string(mid)
-        if udim:
-            output_pattern += actual_udim_pattern
-        output_pattern += general.escape_regex_string(final)
-
-    output = list()
-    parent_d = os.path.split(path)[0]
-    files = os.listdir(parent_d)
-    for test_n in files:
-        test_p = os.path.join(parent_d, test_n)
-        if re.match(output_pattern, test_p):
-            output.append(test_p)
-
-    return output
+    return string, "", ""
 
 
 # ------------------------------------------------------------------------------
@@ -173,9 +241,29 @@ def expand_frame_spec(file_n,
     """
     Given a string of the format (for example):
 
-    this_is_a_sequence.####-####.ext
+    this_is_a_sequence.1001-2300.exe
 
-    Returns an expanded list of files. Does not verify that the files actually
+    Returns an expanded list of files. i.e. a list of:
+
+    this_is_a_sequence.1001.exe
+    this_is_a_sequence.1002.exe
+    this_is_a_sequence.1003.exe
+    etc..
+
+    It can accept formats similar to:
+
+    1001
+    1001-2300
+    1001-2300x2
+    1001-2300:2
+    1001-2300x2,2400-2500
+    1001-2300x2@,2400-2500@
+    etc.
+
+    these numbers must be separated from the rest of the file name by a period
+    or comma. There must be a dash between values if it is more than a single
+    frame.
+    Does not verify that the files actually
     exist.
 
     :param file_n: The string representing the file sequence.
@@ -186,6 +274,8 @@ def expand_frame_spec(file_n,
 
     :return: A list of files.
     """
+
+    # TODO: I think the @ symbol is on the wrong side of the frame step
 
     output = list()
 
@@ -235,6 +325,68 @@ def expand_frame_spec(file_n,
 
     if not output:
         output = [file_n]
+
+    return output
+
+
+# ------------------------------------------------------------------------------
+def expand_files(user_pattern,
+                 padding=None):
+    """
+    Given a single pattern that may include frame specs, UDIM identifiers,
+    and/or sequence identifiers, returns a list of actual files on disk that
+    match these patterns.
+
+    For example, the pattern:
+
+    /tmp/file_name_%03d_<UDIM>.1-3.exr
+
+    might expand out to:
+
+    /tmp/file_name_001_1001.1.exr
+    /tmp/file_name_001_1001.2.exr
+    /tmp/file_name_001_1001.3.exr
+    /tmp/file_name_001_1002.1.exr
+    /tmp/file_name_001_1002.2.exr
+    /tmp/file_name_001_1002.3.exr
+    etc.
+
+    assuming these files actually exist on disk.
+
+    :param user_pattern: The pattern that describes the files on disk, usually
+           provided by an end user.
+
+           Formats allowed are:
+
+           sequence specs (example: 1-10:2,12),
+           UDIM patterns (example: <UDIM>),
+           sequence identifiers (example: .### or %03d)
+
+           See above for an example of an actual pattern.
+    :param padding: Any padding to use when expanding frame specs. If None, then
+           the padding will be determined from the longest number in the
+           sequence. Defaults to None.
+
+    :return: A list of absolute paths to the files represented by the pattern.
+    """
+
+    output = list()
+
+    parent_d, file_pattern_n = os.path.split(os.path.abspath(user_pattern))
+
+    assert os.path.exists(parent_d)
+    assert os.path.isdir(parent_d)
+
+    files_n = os.listdir(parent_d)
+
+    expanded_user_patterns = expand_frame_spec(file_pattern_n, padding)
+    for expanded_user_pattern in expanded_user_patterns:
+
+        re_pattern = seq_and_udim_ids_to_regex(expanded_user_pattern)
+
+        for file_n in files_n:
+            if re.match(re_pattern, file_n):
+                output.append(os.path.join(parent_d, file_n))
 
     return output
 
