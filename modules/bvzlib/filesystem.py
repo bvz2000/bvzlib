@@ -29,7 +29,7 @@ import shutil
 # ------------------------------------------------------------------------------
 def seq_and_udim_ids_to_regex(path,
                               match_hash_length=False,
-                              udim_identifier="<UDIM>",
+                              udim_identifier=None,
                               strict_udim_format=True):
     """
     Given a file string that may have a UDIM identifier and/or a sequence
@@ -61,8 +61,8 @@ def seq_and_udim_ids_to_regex(path,
            a single digit sequence number. If False, then any sequence number,
            no matter how long, would match. If the sequence identifier is in the
            printf format, this argument is ignored.
-    :param udim_identifier: The string that is used as the UDIM identifier.
-           Defaults to "<UDIM>".
+    :param udim_identifier: The string that is used as the UDIM identifier. If
+           None, then the pattern "<UDIM>" will be used. Defaults to None.
     :param strict_udim_format: If True, then UDIM's will have to conform to the
            #### format, where the starting value is 1001. If False, then the
            UDIM must start with four digits, but can then contain any extra
@@ -101,7 +101,7 @@ def seq_and_udim_ids_to_regex(path,
 
 # ------------------------------------------------------------------------------
 def udim_id_to_regex(string,
-                     udim_identifier="<UDIM>",
+                     udim_identifier=None,
                      strict_udim_format=True):
     """
     Given a string that may have a UDIM identifier in it, return the same
@@ -121,8 +121,8 @@ def udim_id_to_regex(string,
     be used.
 
     :param string: The string that may contain UDIM identifiers.
-    :param udim_identifier: The string that is used as the UDIM identifier.
-           Defaults to "<UDIM>".
+    :param udim_identifier: The string that is used as the UDIM identifier. If
+           None, then the pattern "<UDIM>" will be used. Defaults to None.
     :param strict_udim_format: If True, then UDIM's will have to conform to the
            #### format, where the starting value is 1001. If False, then the
            UDIM must start with four digits, but can then contain any extra
@@ -140,6 +140,9 @@ def udim_id_to_regex(string,
              returns the original string in the first element of the tuple, and
              blank strings in the other two elements.
     """
+
+    if udim_identifier is None:
+        udim_identifier = "<UDIM>"
 
     input_pattern = r'.*?(' + re.escape(udim_identifier) + ').*'
 
@@ -331,7 +334,11 @@ def expand_frame_spec(file_n,
 
 # ------------------------------------------------------------------------------
 def expand_files(user_pattern,
-                 padding=None):
+                 padding=None,
+                 udim_identifier=None,
+                 strict_udim_format=True,
+                 match_hash_length=False,
+                 ):
     """
     Given a single pattern that may include frame specs, UDIM identifiers,
     and/or sequence identifiers, returns a list of actual files on disk that
@@ -366,6 +373,22 @@ def expand_files(user_pattern,
     :param padding: Any padding to use when expanding frame specs. If None, then
            the padding will be determined from the longest number in the
            sequence. Defaults to None.
+    :param udim_identifier: The string that is used as the UDIM identifier. If
+           None, then the pattern "<UDIM>" will be used. Defaults to None.
+    :param strict_udim_format: If True, then UDIM's will have to conform to the
+           #### format, where the starting value is 1001. If False, then the
+           UDIM must start with four digits, but can then contain any extra
+           characters. Substance Painter allows this for example. Note, setting
+           this to False may lead to somewhat erroneous identification of UDIM's
+           in files, so - unless absolutely needed - this should be se to True.
+           Defaults to True.
+    :param match_hash_length: If True, then the output regex will be designed
+           such that the number of digits has to match the number of hashes.
+           If False, then a single hash would match any number of digits.
+           For example: if True, then filename.#.exr would only match files with
+           a single digit sequence number. If False, then any sequence number,
+           no matter how long, would match. If the sequence identifier is in the
+           printf format, this argument is ignored.
 
     :return: A list of absolute paths to the files represented by the pattern.
     """
@@ -382,7 +405,10 @@ def expand_files(user_pattern,
     expanded_user_patterns = expand_frame_spec(file_pattern_n, padding)
     for expanded_user_pattern in expanded_user_patterns:
 
-        re_pattern = seq_and_udim_ids_to_regex(expanded_user_pattern)
+        re_pattern = seq_and_udim_ids_to_regex(expanded_user_pattern,
+                                               match_hash_length,
+                                               udim_identifier,
+                                               strict_udim_format)
 
         for file_n in files_n:
             if re.match(re_pattern, file_n):
