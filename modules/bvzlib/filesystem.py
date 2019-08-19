@@ -337,8 +337,7 @@ def expand_files(user_pattern,
                  padding=None,
                  udim_identifier=None,
                  strict_udim_format=True,
-                 match_hash_length=False,
-                 ):
+                 match_hash_length=False):
     """
     Given a single pattern that may include frame specs, UDIM identifiers,
     and/or sequence identifiers, returns a list of actual files on disk that
@@ -414,6 +413,7 @@ def expand_files(user_pattern,
             if re.match(re_pattern, file_n):
                 output.append(os.path.join(parent_d, file_n))
 
+    output.sort()
     return output
 
 
@@ -538,9 +538,9 @@ def md5_for_file(file_p,
 
 
 # ------------------------------------------------------------------------------
-def compare_files(file_a_p,
-                  file_b_p,
-                  block_size=2**20):
+def files_are_identical(file_a_p,
+                        file_b_p,
+                        block_size=2**20):
     """
     Compares two files to see if they are identical. First compares sizes. If
     the sizes match, then it does an md5 checksum on the files to see if they
