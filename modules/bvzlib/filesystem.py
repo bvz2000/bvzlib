@@ -265,9 +265,7 @@ def expand_frame_spec(file_n,
 
     these numbers must be separated from the rest of the file name by a period
     or comma. There must be a dash between values if it is more than a single
-    frame.
-    Does not verify that the files actually
-    exist.
+    frame. Does not verify that the files actually exist.
 
     :param file_n: The string representing the file sequence.
     :param padding: The number of digits to pad the frame numbers to. A padding
@@ -320,7 +318,7 @@ def expand_frame_spec(file_n,
 
         for i in range(start, end + 1, step):
             output_str = name[:match_start + 1]
-            output_str += str(i).rjust(padding_len, "0")
+            output_str += str(i).rjust(padding_len, "0") # TODO: This breaks if the frame numbers are not all the same length
             output_str += name[match_end:]
             output_str = os.path.join(path, output_str)
 
