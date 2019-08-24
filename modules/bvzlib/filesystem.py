@@ -239,93 +239,188 @@ def seq_id_to_regex(string,
 
 
 # ------------------------------------------------------------------------------
-def expand_frame_spec(file_n,
-                      padding=None):
+def find_frame_spec(string):
+    """
+    Finds the framespec in a string. Does NOT break it out into its constituent
+    components (start, end, step).
+
+    :param string: The string to search.
+
+    :return: A tuple with three elements: The string leading up to the last
+             framespec found, the framespec itself, and the string following the
+             framespec. For example: ("filename", ".1-10x2,20,30,32-40.", "tif")
+    """
+
+    # Complete regex pattern is here, rebuilt in pieces below
+    # (?:(?<=\.)|(?<=^))(?:(?:(?<!\.),)?\d+(?:-\d+(?:[x:]-?\d+)?)?)+(?:@+|#+)?(?=\.|$)
+
+    # Always start with a dot or beginning of line (negative lookbehind).
+    fspec_pattern = r"(?:(?<=\.)|(?<=^))"
+
+    # Actual framespec (repeat as many times as needed)
+    fspec_pattern += r"(?:(?:(?<!\.),)?\d+(?:-\d+(?:[x:]-?\d+)?)?)+"
+
+    # May contain an optional string of # or @ symbols at the end.
+    fspec_pattern += r"(?:@+|#+)?"
+
+    # And is followed with a dot or the end of the line (positive lookahead)
+    fspec_pattern += r"(?=\.|$)"
+
+    compiled_pattern = re.compile(fspec_pattern)
+
+    # Separate the last framespec in the file name (only the last one counts)
+    match_start = None
+    match_end = None
+
+    for match in compiled_pattern.finditer(string):
+
+        if match_start:
+            match_start = max(match_start, match.start())
+        else:
+            match_start = match.start()
+
+        if match_end:
+            match_end = max(match_end, match.end())
+        else:
+            match_end = match.end()
+
+    if match_start is None or match_end is None:
+        return string, "", ""
+
+    prefix = string[:match_start]
+    suffix = string[match_end:]
+    framespec = string[match_start:match_end]
+
+    return prefix, framespec, suffix
+
+
+# ------------------------------------------------------------------------------
+def expand_frame_spec(framespec):
+    """
+    Given a framespec, return a list of frame numbers that match. For example:
+    Given 1-5x2,8, return [1,3,5,8]
+
+    Expects a valid framespec. If you give it something that contains non-valid
+    framespec values, the result is undefined.
+
+    :param framespec: The framespec string
+
+    :return: A list of numbers this framespec evaluates to.
+    """
+
+    fspec_pattern = r"(\d+)(?:(?:-(\d+))(?:[x:](-?\d+))?)?"
+    compiled_pattern = re.compile(fspec_pattern)
+
+    output = set()
+
+    for subspec in framespec.split(","):
+
+        for matches in compiled_pattern.finditer(subspec):
+
+            start, end, step = matches.groups()
+
+            start = int(start)
+
+            if not end:
+                end = start
+            else:
+                end = int(end)
+
+            if not step:
+                step = 1
+            else:
+                step = int(step)
+
+            if step > 0:
+                offset = 1
+            else:
+                offset = -1
+
+            for i in range(start, end + offset, step):
+                output.add(i)
+
+    output = sorted(output)
+
+    return output
+
+
+# ------------------------------------------------------------------------------
+def expand_frame_sequence(file_n,
+                          padding=None):
     """
     Given a string of the format (for example):
 
-    this_is_a_sequence.1001-2300.exe
+    filename.1-10.exe
 
     Returns an expanded list of files. i.e. a list of:
 
-    this_is_a_sequence.1001.exe
-    this_is_a_sequence.1002.exe
-    this_is_a_sequence.1003.exe
+    filename.1.exe
+    filename.2.exe
+    filename.3.exe
     etc..
 
     It can accept formats similar to:
 
-    1001
-    1001-2300
-    1001-2300x2
-    1001-2300:2
-    1001-2300x2,2400-2500
-    1001-2300x2@,2400-2500@
+    1
+    1-10
+    1-10x2
+    1-10:2
+    1-10,20-30
+    1-10x2,20-30x2
+    1-10,20-30@
+    1-10,20-30@@
+    1-10,20-30#
+    1-10,20-30##
+    10-1x-1
     etc.
 
-    these numbers must be separated from the rest of the file name by a period
-    or comma. There must be a dash between values if it is more than a single
-    frame. Does not verify that the files actually exist.
+    these numbers must be separated from the rest of the file name by a period.
+    There must be a dash between values if it is more than a single frame.
+    Does not verify that the files actually exist.
 
     :param file_n: The string representing the file sequence.
-    :param padding: The number of digits to pad the frame numbers to. A padding
-           of 1 would mean no padding. If set to None, then the padding will be
-           automatically determined based on the length of the longest frame
-           number. Defaults to None.
+    :param padding: The number of digits to pad the frame numbers to. If None,
+           then no padding will be added. If 0, then the padding will be based
+           on the longest frame number in the sequence. If set to anything other
+           than None or 0, then the padding will be set to that value. Note:
+           the padding may also be described by using the @@@ or ### indicator
+           in the sequence spec itself. That said, using the padding argument in
+           this method (if set to any value other than None) will override the
+           padding given in the format of @@@ or ### in the frame spec string.
+           Defaults to None.
 
-    :return: A list of files.
+    :return: A list of files. These files may or may not exist on disk.
     """
-
-    # TODO: I think the @ symbol is on the wrong side of the frame step
 
     output = list()
 
-    pattern = r"(?:\.|,)(\d+(?:(?:-\d+)?))@?(?:(?:[x:]([1-9]+))*)"
-
     path, name = os.path.split(file_n)
 
-    compiled_pattern = re.compile(pattern)
+    prefix, framespec, suffix = find_frame_spec(name)
 
-    padding_len = 0
-    match_start = len(name)
-    match_end = 0
-    for match in compiled_pattern.finditer(name):
-        frame_range, step = match.groups()
-        match_start = min(match_start, match.start())
-        match_end = max(match_end, match.end())
-        padding_len = max(padding_len, len(frame_range.split("-")[0]))
-        try:
-            padding_len = max(padding_len, len(frame_range.split("-")[1]))
-        except IndexError:
-            pass
+    frames = expand_frame_spec(framespec)
 
-    if padding:
-        padding_len = padding
+    if not frames:
+        return [file_n]
 
-    for match in compiled_pattern.finditer(name):
-        frame_range, step = match.groups()
+    max_len = len(str(max(frames)))
 
-        start = int(frame_range.split("-")[0])
-        try:
-            end = int(frame_range.split("-")[1])
-        except IndexError:
-            end = start
+    for frame in frames:
 
-        try:
-            step = int(step)
-        except (TypeError, ValueError):
-            step = 1
+        if padding is None:
+            padding = 1
 
-        for i in range(start, end + 1, step):
-            output_str = name[:match_start + 1]
-            output_str += str(i).rjust(padding_len, "0") # TODO: This breaks if the frame numbers are not all the same length
-            output_str += name[match_end:]
-            output_str = os.path.join(path, output_str)
+        if padding == 0:
+            padding = max_len
 
-            output.append(output_str)
+        if "#" in framespec:
+            padding = len(framespec.split("#", 1)[1]) + 1
 
-    if not output:
-        output = [file_n]
+        if "@" in framespec:
+            padding = len(framespec.split("@", 1)[1]) + 1
+
+        file_out_n = prefix + str(frame).rjust(padding, "0") + suffix
+        output.append(os.path.join(path, file_out_n))
 
     return output
 
@@ -399,7 +494,7 @@ def expand_files(user_pattern,
 
     files_n = os.listdir(parent_d)
 
-    expanded_user_patterns = expand_frame_spec(file_pattern_n, padding)
+    expanded_user_patterns = expand_frame_sequence(file_pattern_n, padding)
     for expanded_user_pattern in expanded_user_patterns:
 
         re_pattern = seq_and_udim_ids_to_regex(expanded_user_pattern,
