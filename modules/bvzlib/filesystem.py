@@ -192,6 +192,11 @@ def verified_copy_file(src,
     :return: Nothing.
     """
 
+    assert os.path.exists(src)
+    assert os.path.isfile(src)
+    assert os.path.exists(os.path.split(dst)[0])
+    assert os.path.isdir(os.path.split(dst)[0])
+
     shutil.copy(src, dst)
 
     if not files_are_identical(src, dst):
