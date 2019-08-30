@@ -207,6 +207,8 @@ class Options(object):
                 dct["type"] = str
             if settings["type"] == "list":
                 dct["type"] = list
+            if settings["type"] == "bool" or settings["type"] == "boolean":
+                dct["type"] = bool
         else:
             dct["type"] = None
 
@@ -257,14 +259,14 @@ class Options(object):
                 del dct["required"]
 
         # There is no such thing as a bool type, but users might type it in
-        if settings["type"] is "bool":
+        if settings["type"] == "bool":
             if "type" in dct.keys():
                 del dct["type"]
 
         # If the actual type is a boolean as defined by the action, we cannot
         # have metavars or nargs
-        if (settings["action"] is "store_true" or
-            settings["action"] is "store_false"):
+        if (settings["action"] == "store_true" or
+            settings["action"] == "store_false"):
             if "metavar" in dct.keys():
                 del dct["metavar"]
             if "nargs" in dct.keys():
