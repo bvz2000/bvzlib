@@ -205,7 +205,7 @@ def verified_copy_file(src,
 
 
 # --------------------------------------------------------------------------
-def files_keyed_by_size(path_d):
+def dir_files_keyed_by_size(path_d):
     """
     Builds a dictionary of file sizes in a directory. The key is the file size,
     the value is a list of file names.
@@ -217,10 +217,9 @@ def files_keyed_by_size(path_d):
              to the files of this size.
     """
 
-    output = dict()
+    assert os.path.exists(path_d)
 
-    if not os.path.exists(path_d):
-        return output
+    output = dict()
 
     files_n = os.listdir(path_d)
     for file_n in files_n:
@@ -238,6 +237,7 @@ def files_keyed_by_size(path_d):
 # ------------------------------------------------------------------------------
 def copy_and_add_ver_num(source_p,
                          dest_d,
+                         dest_n=None,
                          ver_prefix="v",
                          num_digits=4,
                          do_verified_copy=False):
@@ -249,6 +249,9 @@ def copy_and_add_ver_num(source_p,
 
     :param source_p: The full path to the file to copy.
     :param dest_d: The directory to copy to.
+    :param dest_n: An optional name to rename the copied file to. If None, then
+           the copied file will have the same name as the source file. Defaults
+           to None.
     :param ver_prefix: The prefix to put onto the version number. For example,
            if the prefix is "v", then the version number will be represented as
            "v####". Defaults to "v".
@@ -261,8 +264,17 @@ def copy_and_add_ver_num(source_p,
     :return: A full path to the file that was copied.
     """
 
-    source_d, source_n = os.path.split(source_p)
-    base, ext = os.path.splitext(source_n)
+    assert os.path.exists(source_p)
+    assert os.path.isfile(source_p)
+    assert os.path.exists(dest_d)
+    assert os.path.isdir(dest_d)
+    assert type(num_digits) is int
+    assert type(do_verified_copy) is bool
+
+    if not dest_n:
+        source_d, dest_n = os.path.split(source_p)
+
+    base, ext = os.path.splitext(dest_n)
 
     v = 1
     while True:
@@ -283,13 +295,16 @@ def copy_and_add_ver_num(source_p,
         return dest_p
 
 
-# --------------------------------------------------------------------------
+# TODO: Make this windows safe
+# ------------------------------------------------------------------------------
 def copy_file_deduplicated(source_p,
-                           dest_p,
+                           dest_d,
                            data_d,
                            data_sizes,
+                           dest_n=None,
                            ver_prefix="v",
-                           num_digits=4):
+                           num_digits=4,
+                           do_verified_copy=False):
     """
     Given a full path to a source file, copy that file into the data directory
     and make a symlink in dest_p that points to this file. Does de-duplication
@@ -297,33 +312,47 @@ def copy_file_deduplicated(source_p,
     the same data, it will only be stored in data_d once.
 
     :param source_p: The path to the source file being stored.
-    :param dest_p: The full path where the file will appear to be stored. In
-           fact this will become a symlink to actual file in data_d.
+    :param dest_d: The full path of the directory where the file will appear to
+           be stored. In actual fact this will really become a symlink to the
+           actual file which will be stored in data_d. dest_d may not be a
+           sub-directory of data_d.
     :param data_d: The directory where the actual files will be
            stored.
     :param data_sizes: A dictionary of all the files in the data_d keyed on file
            size. The key is the file size, the value is a list of files in
            data_d that are of that size.
+    :param dest_n: An optional name to rename the copied file to. If None, then
+           the copied file will have the same name as the source file. Defaults
+           to None.
     :param ver_prefix: The prefix to put onto the version number. For example,
            if the prefix is "v", then the version number will be represented as
            "v####". Defaults to "v".
     :param num_digits: How much padding to use for the version numbers. For
            example, 4 would lead to versions like: v0001 whereas 3 would lead to
            versions like: v001. Defaults to 4.
+    :param do_verified_copy: If True, then a verified copy will be performed.
+           Defaults to False.
 
     :return: The path to the actual de-duplicated file in data_d.
     """
 
-    # Make sure that the dest_p is not a sub-dir of data_d. Do some other tests.
-    assert not dest_p.startswith(data_d)
+    assert not dest_d.startswith(data_d)
     assert os.path.exists(source_p)
+    assert os.path.isfile(source_p)
     assert os.path.exists(data_d)
     assert os.path.isdir(data_d)
-    assert not os.path.isdir(source_p)
+    assert os.path.exists(dest_d)
+    assert os.path.isdir(dest_d)
     assert type(data_sizes) == dict
+    for key in data_sizes:
+        assert type(data_sizes[key]) == list
+    assert type(num_digits) is int
+    assert type(do_verified_copy) is bool
 
-    # Get the size of the current file
     size = os.path.getsize(source_p)
+
+    if not dest_n:
+        dest_n = os.path.split(source_p)[1]
 
     # Check to see if there is a list of files of that size in the .data dir
     try:
@@ -344,21 +373,24 @@ def copy_file_deduplicated(source_p,
     # data_d dir, with an added version number that ensures that we do
     # not  overwrite any previous versions of files with the same name.
     if matched_p is None:
-        matched_p = copy_and_add_ver_num(source_p, data_d, ver_prefix,
-                                         num_digits)
+        matched_p = copy_and_add_ver_num(source_p=source_p,
+                                         dest_d=data_d,
+                                         dest_n=dest_n,
+                                         ver_prefix=ver_prefix,
+                                         num_digits=num_digits,
+                                         do_verified_copy=do_verified_copy)
 
-    # Lock this file to the extent that we can
     os.chmod(matched_p, 0o644)
 
     # Build a relative path from where the symlink will go to the file in
     # the data dir. Then create a symlink to this file in the destination.
-    dest_parent_p = os.path.split(dest_p.rstrip(os.path.sep))[0]
+    dest_d = dest_d.rstrip(os.path.sep)
     matched_file_n = os.path.split(matched_p.rstrip(os.path.sep))[1]
-    relative_d = os.path.relpath(data_d, dest_parent_p)
+    relative_d = os.path.relpath(data_d, dest_d)
     relative_p = os.path.join(relative_d, matched_file_n)
-    if os.path.exists(dest_p):
-        os.unlink(dest_p)
-    os.symlink(relative_p, dest_p)
+    if os.path.exists(os.path.join(dest_d, dest_n)):
+        os.unlink(os.path.join(dest_d, dest_n))
+    os.symlink(relative_p, os.path.join(dest_d, dest_n))
 
     return matched_p
 
@@ -388,6 +420,11 @@ def ancestor_contains_file(path_p,
              If no ancestors contain any of these files, returns None.
     """
 
+    assert depth is None or type(depth) is int
+    assert os.path.exists(path_p)
+    assert os.path.isdir(path_p)
+    assert type(files_n) is str or type(files_n) is list
+
     if type(files_n) != list:
         files_n = [files_n]
 
@@ -415,6 +452,7 @@ def ancestor_contains_file(path_p,
         if depth and count >= depth:
             return None
 
+        # TODO: Probably not windows safe
         # Check to see if we are at the root level (bail if we are)
         if os.path.dirname(test_p) == test_p:
             if already_at_root:
