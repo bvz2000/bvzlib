@@ -46,6 +46,11 @@ def invert_dir_list(parent_d,
              subdirs_n.
     """
 
+    assert os.path.exists(parent_d)
+    assert os.path.isdir(parent_d)
+    assert type(subdirs_n) is list
+    assert pattern is None or type(pattern) is list
+
     items_n = os.listdir(parent_d)
     output = list()
 
@@ -78,6 +83,7 @@ def convert_unix_path_to_os_path(path):
     return os.path.join(*path.lstrip("/").split("/"))
 
 
+# TODO: Make windows friendly
 # ------------------------------------------------------------------------------
 def symlinks_to_real_paths(symlinks_p):
     """
@@ -85,10 +91,14 @@ def symlinks_to_real_paths(symlinks_p):
     works on Unix-like systems for the moment.
 
     :param symlinks_p: The list of symlinks. If a file in this list is not
-           a symlink, its path will be included unchanged.
+           a symlink, its path will be included unchanged. If a file in this
+           list does not exist, it will be treated as though it is not a
+           symlink.
 
     :return: A list of the real paths being pointed to by the symlinks.
     """
+
+    assert type(symlinks_p) is list
 
     output = list()
 
@@ -108,8 +118,9 @@ def recursively_list_files_in_dirs(source_dirs_d):
              (or any of their sub-directories)
     """
 
-    if type(source_dirs_d) != list:
-        source_dirs_d = [source_dirs_d]
+    assert type(source_dirs_d) is list
+    for source_dir_d in source_dirs_d:
+        assert os.path.exists(source_dir_d)
 
     output = list()
 
@@ -132,6 +143,9 @@ def md5_for_file(file_p,
 
     :return: The md5 checksum.
     """
+
+    assert os.path.exists(file_p)
+    assert type(block_size) is int
 
     md5 = hashlib.md5()
     with open(file_p, "rb") as f:
@@ -458,3 +472,19 @@ def ancestor_contains_file(path_p,
             if already_at_root:
                 return None
             already_at_root = True
+
+
+# ------------------------------------------------------------------------------
+def lock_dir(path_d):
+    """
+    Changes the permissions on a directory so that it is readable and
+    executable, but may not be otherwise altered.
+
+    :param path_p: The path to the directory we want to lock.
+
+    :return: Nothing.
+    """
+
+    assert os.path.exists(path_d)
+    assert os.path.isdir(path_d)
+
