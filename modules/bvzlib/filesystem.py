@@ -49,7 +49,7 @@ def invert_dir_list(parent_d,
     assert os.path.exists(parent_d)
     assert os.path.isdir(parent_d)
     assert type(subdirs_n) is list
-    assert pattern is None or type(pattern) is list
+    assert pattern is None or type(pattern) is str
 
     items_n = os.listdir(parent_d)
     output = list()
