@@ -64,6 +64,43 @@ class Config(ConfigParser.SafeConfigParser):
         self.read(self.config_p)
 
     # --------------------------------------------------------------------------
+    def validation_failures(self,
+                            sections):
+        """
+        Makes sure the config file is valid.
+
+        :param sections: A dictionary where the key is the name of the section
+               that must exist, and the value is a list of items that must exist
+               within that section. If only the section must exist, but there is
+               no hard and fast rule about the entries, just set this list of
+               items to be = [None].
+
+        :return: If the validation fails, returns a two item tuple where the
+                 first item is section that failed. The second item will either
+                 be None (if it is the entire section that is missing) or it
+                 will be the item that was missing from that section (if the
+                 section exists, but the item is missing. If the validation
+                 succeeds, returns None.
+        """
+
+        assert type(sections) is dict
+        for section in sections:
+            assert type(sections[section]) is list
+
+        # Check sections
+        for section in sections:
+            if not self.has_section(section):
+                return section, None
+
+            for setting in sections[section]:
+                if setting:
+                    if not self.has_option(section, setting):
+                        return section, setting
+
+        # All good
+        return None
+
+    # --------------------------------------------------------------------------
     def save(self):
         """
         Writes the config parser back out to disk.
