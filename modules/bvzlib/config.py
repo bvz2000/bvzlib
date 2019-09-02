@@ -52,6 +52,8 @@ class Config(ConfigParser.SafeConfigParser):
         ConfigParser.SafeConfigParser.__init__(self, allow_no_value=True)
 
         assert not (config_p is None and config_p_env_var is None)
+        assert config_p is None or type(config_p) is str
+        assert config_p_env_var is None or type(config_p_env_var) is str
 
         if config_p_env_var is not None and config_p_env_var in os.environ:
             self.config_p = os.environ[config_p_env_var]
