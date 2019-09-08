@@ -159,6 +159,9 @@ class Resources(ConfigParser.SafeConfigParser):
         :return: A string.
         """
 
+        assert self.has_section("messages")
+        assert self.has_option("messages", str(message_key))
+
         msg = self.get("messages", str(message_key))
         msg = self.format_string(msg)
 
