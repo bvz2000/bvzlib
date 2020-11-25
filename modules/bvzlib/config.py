@@ -110,5 +110,11 @@ class Config(ConfigParser.SafeConfigParser):
         :return: Nothing.
         """
 
-        with open(self.config_p, "w") as f:
-            self.write(f)
+        try:
+            with open(self.config_p, "w") as f:
+                self.write(f)
+        except IOError as err:
+            if err.errno == 13:
+                raise IOError("You do not have write permission for: " + self.config_p)
+            else:
+                raise
